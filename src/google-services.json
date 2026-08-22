@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "636727047806",
+    "project_id": "trackguard-dd2d4",
+    "storage_bucket": "trackguard-dd2d4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:636727047806:android:896c765fe387a7447bca2f",
+        "android_client_info": {
+          "package_name": "Trackguard.tg"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdInchOhFyfsjqm5fnpHkDNdjpySd6QrA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
