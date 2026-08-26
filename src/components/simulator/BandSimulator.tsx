@@ -4,6 +4,7 @@ import { SafetyBand, FamilyMember } from '../../types';
 import { bandService } from '../../services/bandService';
 import { alertService } from '../../services/alertService';
 import { activityService } from '../../services/activityService';
+import { hardwareRtdbService } from '../../services/hardwareRtdbService';
 import { useAuth } from '../../context/AuthContext';
 
 interface BandSimulatorProps {
@@ -41,7 +42,15 @@ export const BandSimulator: React.FC<BandSimulatorProps> = ({ bands, familyMembe
           memberId: currentBand.assignedMemberId,
           actorUid: firebaseUser.uid,
         });
-        setLastSimAction(`Set status of ${currentBand.deviceName} to Connected.`);
+
+        // Sync to RTDB
+        await hardwareRtdbService.updateHardwareTelemetry('TG-BAND-01', {
+          status: 'normal',
+          rgbLedMode: 'NORMAL_GREEN',
+          batteryLevel: 92
+        });
+
+        setLastSimAction(`Set status of ${currentBand.deviceName} to Connected & synced with RTDB.`);
       } else if (action === 'disconnect') {
         await bandService.updateBand(firebaseUser.uid, currentBand.id, {
           connectionStatus: 'disconnected',
@@ -63,7 +72,20 @@ export const BandSimulator: React.FC<BandSimulatorProps> = ({ bands, familyMembe
           memberId: currentBand.assignedMemberId,
           actorUid: firebaseUser.uid,
         });
-        setLastSimAction(`Simulated Disconnection for ${currentBand.deviceName}. High alert generated.`);
+
+        // Sync to RTDB
+        await hardwareRtdbService.publishAlert({
+          type: 'tamper_disconnect',
+          severity: 'high',
+          title: 'Band Hardware Disconnected',
+          message: `${currentBand.deviceName} lost wireless ping`,
+          lat: 11.4138,
+          lng: 76.6958,
+          timestamp: new Date().toISOString(),
+          status: 'active'
+        });
+
+        setLastSimAction(`Simulated Disconnection for ${currentBand.deviceName}. Synced to RTDB alerts.`);
       } else if (action === 'low_battery') {
         await bandService.updateBand(firebaseUser.uid, currentBand.id, {
           batteryLevel: 12,
@@ -85,7 +107,14 @@ export const BandSimulator: React.FC<BandSimulatorProps> = ({ bands, familyMembe
           memberId: currentBand.assignedMemberId,
           actorUid: firebaseUser.uid,
         });
-        setLastSimAction(`Simulated Low Battery (12%) for ${currentBand.deviceName}.`);
+
+        // Sync to RTDB
+        await hardwareRtdbService.updateHardwareTelemetry('TG-BAND-01', {
+          batteryLevel: 12,
+          status: 'low_battery'
+        });
+
+        setLastSimAction(`Simulated Low Battery (12%) for ${currentBand.deviceName}. Synced to RTDB.`);
       } else if (action === 'tamper') {
         await bandService.updateBand(firebaseUser.uid, currentBand.id, {
           status: 'tamper_alert',
@@ -106,7 +135,24 @@ export const BandSimulator: React.FC<BandSimulatorProps> = ({ bands, familyMembe
           memberId: currentBand.assignedMemberId,
           actorUid: firebaseUser.uid,
         });
-        setLastSimAction(`Simulated Tamper Alert for ${currentBand.deviceName}. Critical alert created.`);
+
+        // Sync to RTDB
+        await hardwareRtdbService.updateHardwareTelemetry('TG-BAND-01', {
+          status: 'tamper_alert',
+          rgbLedMode: 'TAMPER_ORANGE'
+        });
+        await hardwareRtdbService.publishAlert({
+          type: 'tamper_disconnect',
+          severity: 'critical',
+          title: 'Hardware Tamper Switch Disconnect',
+          message: 'Tension breach detected on ESP32-C3 band latch',
+          lat: 11.4138,
+          lng: 76.6958,
+          timestamp: new Date().toISOString(),
+          status: 'active'
+        });
+
+        setLastSimAction(`Simulated Tamper Alert for ${currentBand.deviceName}. Critical RTDB alert created.`);
       }
     } catch (err: any) {
       console.error('Error during band simulation:', err);

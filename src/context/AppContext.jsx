@@ -4,6 +4,7 @@ import { bandService as BandService } from '../services/bandService';
 import { EmergencyService, EMERGENCY_STEPS } from '../services/EmergencyService';
 import { ResponderService } from '../services/ResponderService';
 import { notificationService as NotificationService } from '../services/notificationService';
+import { hardwareRtdbService } from '../services/hardwareRtdbService';
 
 
 const AppContext = createContext();
@@ -94,7 +95,10 @@ export const AppProvider = ({ children }) => {
     gpsStatus: 'CONNECTED (12 SAT)',
     cellularStatus: '5G ENCRYPTED',
     skinSensor: true,
-    physicalReleaseDisabled: true
+    physicalReleaseDisabled: true,
+    rgbLedMode: 'NORMAL_GREEN',
+    buzzerActive: false,
+    vibrationActive: false
   });
 
   // Emergency Incident State
@@ -132,6 +136,85 @@ export const AppProvider = ({ children }) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // Real-time Firebase RTDB Hardware Telemetry Subscriptions
+  useEffect(() => {
+    // 1. Subscribe to ESP32 location node
+    const unsubLocation = hardwareRtdbService.subscribeLocation((loc) => {
+      if (loc && loc.lat && loc.lng) {
+        setTraveler((prev) => ({
+          ...prev,
+          location: { lat: loc.lat, lng: loc.lng },
+          battery: loc.battery ?? prev.battery,
+          isBandConnected: true,
+          lastUpdated: 'Live ESP32-C3 RTDB'
+        }));
+      }
+    });
+
+    // 2. Subscribe to ESP32 band status node
+    const unsubBand = hardwareRtdbService.subscribeBandStatus('TG-BAND-01', (status) => {
+      if (status) {
+        setBandState((prev) => ({
+          ...prev,
+          lockStatus: status.lockStatus || prev.lockStatus,
+          tamperStatus: status.status === 'tamper_alert' ? 'TAMPER_ALERT' : 'SECURE',
+          rgbLedMode: status.rgbLedMode || 'NORMAL_GREEN',
+          buzzerActive: status.buzzerActive || false,
+          vibrationActive: status.vibrationActive || false
+        }));
+
+        if (status.batteryLevel !== undefined) {
+          setTraveler((prev) => ({ ...prev, battery: status.batteryLevel }));
+        }
+
+        if (status.status === 'tamper_alert') {
+          triggerTamperSimulation();
+        }
+      }
+    });
+
+    // 3. Subscribe to RTDB Alerts node
+    const unsubAlerts = hardwareRtdbService.subscribeAlerts((alertsList) => {
+      if (alertsList.length > 0) {
+        const activeSOS = alertsList.find(a => a.type === 'sos_push_button' && a.status === 'active');
+        if (activeSOS) {
+          triggerManualSOS();
+        }
+      }
+    });
+
+    return () => {
+      unsubLocation();
+      unsubBand();
+      unsubAlerts();
+    };
+  }, []);
+
+  // Hardware Remote Command Actions
+  const triggerHardwareBuzzer = async (active = true) => {
+    await hardwareRtdbService.sendHardwareCommand('TG-BAND-01', {
+      type: 'BUZZER',
+      payload: { active }
+    });
+    addToast(active ? '🔊 BUZZER SOUNDING' : '🔇 BUZZER OFF', active ? 'Command sent to ESP32-C3 Hardware' : 'Buzzer deactivated', 'info');
+  };
+
+  const triggerHardwareVibration = async (active = true) => {
+    await hardwareRtdbService.sendHardwareCommand('TG-BAND-01', {
+      type: 'VIBRATION',
+      payload: { active }
+    });
+    addToast(active ? '📳 VIBRATION MOTOR ACTIVE' : '📳 VIBRATION OFF', active ? 'Haptic feedback sent to band' : 'Vibration stopped', 'info');
+  };
+
+  const setRgbLedMode = async (mode = 'NORMAL_GREEN') => {
+    await hardwareRtdbService.sendHardwareCommand('TG-BAND-01', {
+      type: 'SET_RGB',
+      payload: { mode }
+    });
+    addToast('🎨 RGB LED UPDATED', `Set hardware LED mode to ${mode}`, 'info');
+  };
+
   // Trigger Tamper Emergency Simulation
   const triggerTamperSimulation = () => {
     const incident = EmergencyService.triggerTamperAlert(traveler.name, traveler.address);
@@ -140,10 +223,23 @@ export const AppProvider = ({ children }) => {
     setBandState((prev) => ({
       ...prev,
       tamperStatus: 'TAMPER_ALERT',
-      geofenceStatus: 'BREACHED'
+      geofenceStatus: 'BREACHED',
+      rgbLedMode: 'TAMPER_ORANGE'
     }));
     setActiveScreen('tamper');
     addToast('⚠️ TAMPER ALERT', 'Possible forced removal detected on Ananya\'s band!', 'danger');
+
+    // Sync to RTDB
+    hardwareRtdbService.publishAlert({
+      type: 'tamper_disconnect',
+      severity: 'critical',
+      title: 'Tamper Sensor Disconnect',
+      message: 'Physical clasp latch breached on ESP32-C3 device',
+      lat: traveler.location.lat,
+      lng: traveler.location.lng,
+      timestamp: new Date().toISOString(),
+      status: 'active'
+    });
   };
 
   // Trigger Manual SOS Simulation
@@ -153,10 +249,23 @@ export const AppProvider = ({ children }) => {
     setIsEmergencyActive(true);
     setBandState((prev) => ({
       ...prev,
-      tamperStatus: 'TAMPER_ALERT'
+      tamperStatus: 'TAMPER_ALERT',
+      rgbLedMode: 'SOS_RED'
     }));
     setActiveScreen('sos');
     addToast('🚨 SOS ACTIVATED', 'Emergency protocol initiated by traveler!', 'danger');
+
+    // Sync to RTDB
+    hardwareRtdbService.publishAlert({
+      type: 'sos_push_button',
+      severity: 'critical',
+      title: 'SOS Hardware Button Triggered',
+      message: 'Long press SOS distress signal from ESP32-C3 band',
+      lat: traveler.location.lat,
+      lng: traveler.location.lng,
+      timestamp: new Date().toISOString(),
+      status: 'active'
+    });
   };
 
   // Resolve Emergency
@@ -166,7 +275,8 @@ export const AppProvider = ({ children }) => {
     setBandState((prev) => ({
       ...prev,
       tamperStatus: 'SECURE',
-      geofenceStatus: 'INSIDE_SAFE_ZONE'
+      geofenceStatus: 'INSIDE_SAFE_ZONE',
+      rgbLedMode: 'NORMAL_GREEN'
     }));
     setResponderUnit((prev) => ({
       ...prev,
@@ -174,6 +284,13 @@ export const AppProvider = ({ children }) => {
       status: "PATROLLING"
     }));
     addToast('✅ INCIDENT RESOLVED', 'Safety confirmed. All systems secure.', 'success');
+
+    hardwareRtdbService.updateHardwareTelemetry('TG-BAND-01', {
+      status: 'normal',
+      rgbLedMode: 'NORMAL_GREEN',
+      buzzerActive: false,
+      vibrationActive: false
+    });
   };
 
   // Request Band Unlock by Guardian
@@ -181,17 +298,23 @@ export const AppProvider = ({ children }) => {
     setBandState((prev) => ({ ...prev, lockStatus: 'UNLOCK_REQUESTED' }));
     const res = await BandService.requestElectronicUnlock('GUARDIAN-01');
     addToast('🔐 UNLOCK REQUESTED', res.message, 'warning');
+
+    hardwareRtdbService.updateHardwareTelemetry('TG-BAND-01', { lockStatus: 'UNLOCK_REQUESTED' });
   };
 
   const approveBandUnlock = async () => {
     await BandService.confirmUnlockByGuardian();
-    setBandState((prev) => ({ ...prev, lockStatus: 'UNLOCKED' }));
+    setBandState((prev) => ({ ...prev, lockStatus: 'UNLOCKED', rgbLedMode: 'CHARGING_BLUE' }));
     addToast('🔓 BAND UNLOCKED', 'Safety band disengaged electronically.', 'success');
+
+    hardwareRtdbService.sendHardwareCommand('TG-BAND-01', { type: 'UNLOCK_STRAP' });
   };
 
   const relockBand = () => {
-    setBandState((prev) => ({ ...prev, lockStatus: 'LOCKED' }));
+    setBandState((prev) => ({ ...prev, lockStatus: 'LOCKED', rgbLedMode: 'NORMAL_GREEN' }));
     addToast('🔒 BAND LOCKED', 'Physical release disengaged. Band secure.', 'info');
+
+    hardwareRtdbService.updateHardwareTelemetry('TG-BAND-01', { lockStatus: 'LOCKED', rgbLedMode: 'NORMAL_GREEN' });
   };
 
   // Demo Stepper Controls
@@ -303,6 +426,9 @@ export const AppProvider = ({ children }) => {
         requestBandUnlock,
         approveBandUnlock,
         relockBand,
+        triggerHardwareBuzzer,
+        triggerHardwareVibration,
+        setRgbLedMode,
         isOfflineMode,
         setIsOfflineMode,
         toasts,
@@ -341,7 +467,10 @@ const defaultAppContext = {
     gpsStatus: 'CONNECTED (12 SAT)',
     cellularStatus: '5G ENCRYPTED',
     skinSensor: true,
-    physicalReleaseDisabled: true
+    physicalReleaseDisabled: true,
+    rgbLedMode: 'NORMAL_GREEN',
+    buzzerActive: false,
+    vibrationActive: false
   },
   setBandState: () => {},
   emergencyIncident: null,
@@ -361,6 +490,9 @@ const defaultAppContext = {
   requestBandUnlock: () => {},
   approveBandUnlock: () => {},
   relockBand: () => {},
+  triggerHardwareBuzzer: () => {},
+  triggerHardwareVibration: () => {},
+  setRgbLedMode: () => {},
   isOfflineMode: false,
   setIsOfflineMode: () => {},
   toasts: [],
@@ -369,4 +501,5 @@ const defaultAppContext = {
 };
 
 export const useApp = () => useContext(AppContext) || defaultAppContext;
+
 

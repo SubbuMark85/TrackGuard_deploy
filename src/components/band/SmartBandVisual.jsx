@@ -13,7 +13,12 @@ import {
   CheckCircle2,
   Key,
   ShieldAlert,
-  Smartphone
+  Smartphone,
+  Volume2,
+  Vibrate,
+  Lightbulb,
+  FileText,
+  Wifi
 } from 'lucide-react';
 
 export const SmartBandVisual = () => {
@@ -24,10 +29,14 @@ export const SmartBandVisual = () => {
     approveBandUnlock,
     relockBand,
     triggerTamperSimulation,
+    triggerHardwareBuzzer,
+    triggerHardwareVibration,
+    setRgbLedMode,
     userRole
   } = useApp();
 
   const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [showSchematicModal, setShowSchematicModal] = useState(false);
 
   const isLocked = bandState.lockStatus === 'LOCKED';
   const isUnlockRequested = bandState.lockStatus === 'UNLOCK_REQUESTED';
@@ -40,19 +49,19 @@ export const SmartBandVisual = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-family-title)', fontSize: '1.4rem', fontWeight: '800', color: '#FFFFFF' }}>
-            TrackGuard Smart Safety Band
+            TrackGuard ESP32-C3 Safety Band
           </h2>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Device ID: TG-BAND-9821-X · Paired with {traveler.name}
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Wifi size={12} color="#10B981" /> RTDB Connected · Paired with {traveler.name}
           </p>
         </div>
 
         <span className={isTamperAlert ? "badge badge-emergency" : isUnlocked ? "badge badge-warning" : "badge badge-safe"}>
-          {isTamperAlert ? "⚠ TAMPER ALERT" : isUnlocked ? "UNLOCKED" : "SECURE"}
+          {isTamperAlert ? "⚠ TAMPER ALERT" : isUnlocked ? "UNLOCKED" : "ESP32 ONLINE"}
         </span>
       </div>
 
-      {/* Virtual 3D Graphic & Status Ring */}
+      {/* Virtual Graphic & Live Status Ring */}
       <div className="glass-panel" style={{
         padding: '24px',
         display: 'flex',
@@ -140,11 +149,11 @@ export const SmartBandVisual = () => {
               marginTop: '4px',
               fontFamily: 'var(--font-family-mono)'
             }}>
-              {isTamperAlert ? "TAMPER" : isUnlocked ? "DISENGAGED" : "LOCKED"}
+              {isTamperAlert ? "TAMPER" : isUnlocked ? "DISENGAGED" : "ESP32-C3 SECURE"}
             </span>
 
             <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
-              84% BATTERY
+              {traveler.battery}% BATT · Li-Po
             </span>
           </div>
         </div>
@@ -160,10 +169,10 @@ export const SmartBandVisual = () => {
           border: '1px solid var(--border-subtle)'
         }}>
           <div style={{ fontSize: '0.82rem', fontWeight: '700', color: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-            <Shield size={14} color="#5BC0BE" /> Physical release: Disabled
+            <Shield size={14} color="#5BC0BE" /> Hardware Release: Electronic Encryption Active
           </div>
           <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            The band can only be unlocked after guardian electronic approval.
+            Syncing via Firebase RTDB endpoint: trackguard-dd2d4-default-rtdb
           </p>
         </div>
       </div>
@@ -173,45 +182,112 @@ export const SmartBandVisual = () => {
         <div className="glass-card" style={{ padding: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <Radio size={16} color="#10B981" />
-            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>GPS Satellite</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>Neo-6M GPS</span>
           </div>
           <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#F9FAFB' }}>
-            Connected (12 Sat)
+            Connected (UART1)
           </div>
-          <span style={{ fontSize: '0.68rem', color: '#10B981' }}>Accuracy: ±1.2 meters</span>
+          <span style={{ fontSize: '0.68rem', color: '#10B981' }}>Accuracy: ±1.2m (12 Sats)</span>
         </div>
 
         <div className="glass-card" style={{ padding: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <Zap size={16} color="#3B82F6" />
-            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>Cellular Network</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>Li-Po Power</span>
           </div>
           <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#F9FAFB' }}>
-            5G Encrypted
+            {traveler.battery}% (ADC1_CH0)
           </div>
-          <span style={{ fontSize: '0.68rem', color: '#3B82F6' }}>Latency: 14 ms</span>
+          <span style={{ fontSize: '0.68rem', color: '#3B82F6' }}>TP4056 Charger Integrated</span>
         </div>
 
         <div className="glass-card" style={{ padding: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <Activity size={16} color={isTamperAlert ? '#EF4444' : '#10B981'} />
-            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>Tamper Sensor</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>Tamper Switch</span>
           </div>
           <div style={{ fontSize: '0.88rem', fontWeight: '800', color: isTamperAlert ? '#EF4444' : '#10B981' }}>
-            {isTamperAlert ? "TENSION BREACH!" : "Microswitch Intact"}
+            {isTamperAlert ? "TENSION BREACH!" : "GPIO4 Latch Intact"}
           </div>
-          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Skin Proximity Active</span>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Wrist Proximity Pin</span>
         </div>
 
         <div className="glass-card" style={{ padding: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <Cpu size={16} color="#5BC0BE" />
-            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>Electronic Lock</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--text-muted)' }}>ESP32-C3 SoC</span>
           </div>
           <div style={{ fontSize: '0.88rem', fontWeight: '800', color: isUnlocked ? '#F59E0B' : '#5BC0BE' }}>
-            {isUnlocked ? "Disengaged" : "Guardian Authorized"}
+            {isUnlocked ? "Strap Disengaged" : "RISC-V Wi-Fi Active"}
           </div>
-          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Hardware Lock Engaged</span>
+          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Firebase RTDB Sync</span>
+        </div>
+      </div>
+
+      {/* Real-time Hardware Remote Control Panel (SIH Showcase) */}
+      <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', border: '1px solid var(--border-cyan)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#5BC0BE', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Cpu size={18} /> ESP32-C3 Remote Hardware Controls
+          </h3>
+          <button
+            onClick={() => setShowSchematicModal(true)}
+            style={{ fontSize: '0.72rem', color: '#6FFFE9', background: 'rgba(91, 192, 190, 0.15)', border: '1px solid #5BC0BE', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            <FileText size={12} /> Pinout & Schematic
+          </button>
+        </div>
+
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          Send live triggers directly to physical ESP32-C3 hardware via Firebase Realtime Database:
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+          <button
+            className="btn btn-outline"
+            onClick={() => triggerHardwareBuzzer(true)}
+            style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+          >
+            <Volume2 size={16} color="#F59E0B" /> Sound Siren Buzzer
+          </button>
+
+          <button
+            className="btn btn-outline"
+            onClick={() => triggerHardwareVibration(true)}
+            style={{ padding: '10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+          >
+            <Vibrate size={16} color="#3B82F6" /> Test Vibration Motor
+          </button>
+        </div>
+
+        <div>
+          <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Set RGB LED Status Color:</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+            <button
+              onClick={() => setRgbLedMode('NORMAL_GREEN')}
+              style={{ padding: '6px', fontSize: '0.7rem', background: '#064E3B', color: '#6EE7B7', border: '1px solid #10B981', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              🟢 Safe Green
+            </button>
+            <button
+              onClick={() => setRgbLedMode('SOS_RED')}
+              style={{ padding: '6px', fontSize: '0.7rem', background: '#7F1D1D', color: '#FCA5A5', border: '1px solid #EF4444', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              🔴 SOS Red
+            </button>
+            <button
+              onClick={() => setRgbLedMode('TAMPER_ORANGE')}
+              style={{ padding: '6px', fontSize: '0.7rem', background: '#78350F', color: '#FDE68A', border: '1px solid #F59E0B', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              🟠 Tamper
+            </button>
+            <button
+              onClick={() => setRgbLedMode('CHARGING_BLUE')}
+              style={{ padding: '6px', fontSize: '0.7rem', background: '#1E3A8A', color: '#93C5FD', border: '1px solid #3B82F6', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              🔵 Unlock Blue
+            </button>
+          </div>
         </div>
       </div>
 
@@ -271,7 +347,7 @@ export const SmartBandVisual = () => {
           onClick={triggerTamperSimulation}
           style={{ width: '100%', padding: '12px', fontSize: '0.9rem' }}
         >
-          <ShieldAlert size={18} /> Simulate Tamper Alert
+          <ShieldAlert size={18} /> Simulate Tamper Disconnect
         </button>
       </div>
 
@@ -357,6 +433,74 @@ export const SmartBandVisual = () => {
           </div>
         </div>
       )}
+
+      {/* SIH Hardware Wiring & Schematic Modal */}
+      {showSchematicModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 1300,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div className="glass-panel" style={{
+            maxWidth: '500px',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            width: '100%',
+            padding: '24px',
+            background: '#0B1120',
+            border: '1px solid #5BC0BE',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)', pb: '10px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#6FFFE9', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Cpu size={20} /> ESP32-C3 Circuit Pinout (SIH Architecture)
+              </h3>
+              <button
+                onClick={() => setShowSchematicModal(false)}
+                style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: '1.2rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ fontSize: '0.8rem', color: '#D1D5DB', lineHeight: 1.6 }}>
+              <p style={{ marginBottom: '10px' }}>
+                <strong>Hardware Components Allocation & GPIO Mapping:</strong>
+              </p>
+              <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <li><strong>1. ESP32-C3 RISC-V SoC:</strong> Core Wi-Fi + BLE Microcontroller</li>
+                <li><strong>2. Neo-6M GPS Module:</strong> UART1 (RX = GPIO20, TX = GPIO21)</li>
+                <li><strong>3. SOS Push Button:</strong> GPIO3 (Active-LOW Interrupt + Internal Pull-Up)</li>
+                <li><strong>4. Tamper / Disconnect Latch:</strong> GPIO4 (Wrist Strap Tension Switch)</li>
+                <li><strong>5. Li-Po Battery Monitoring:</strong> GPIO1 (ADC1_CH0 100k:100k Divider)</li>
+                <li><strong>6. Vibration Motor & Buzzer:</strong> GPIO5 (Haptics) & GPIO6 (Siren Tone)</li>
+                <li><strong>7. RGB LED Status Indicator:</strong> GPIO8 (Red), GPIO9 (Green), GPIO10 (Blue)</li>
+              </ul>
+            </div>
+
+            <div style={{ background: '#131C31', padding: '12px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.72rem', color: '#5BC0BE', border: '1px dashed #3B82F6' }}>
+              Firebase RTDB Node: https://trackguard-dd2d4-default-rtdb.firebaseio.com/
+            </div>
+
+            <button
+              className="btn btn-cyan"
+              onClick={() => setShowSchematicModal(false)}
+              style={{ width: '100%', marginTop: '6px' }}
+            >
+              Close Schematic
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
