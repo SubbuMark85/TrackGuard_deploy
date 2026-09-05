@@ -16,9 +16,12 @@ import {
   AlertCircle,
   CheckCircle2,
   Navigation,
-  FileText
+  FileText,
+  AlertTriangle,
+  PhoneCall
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useApp } from '../context/AppContext';
 import { tripService } from '../services/tripService';
 import { familyService } from '../services/familyService';
 import { contactService } from '../services/contactService';
@@ -46,6 +49,7 @@ type FilterTab = 'all' | 'active' | 'upcoming' | 'completed';
 
 export const TripsPage: React.FC = () => {
   const { firebaseUser, appUserProfile } = useAuth();
+  const { traveler, userRole, setUserRole } = useApp();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
@@ -172,144 +176,124 @@ export const TripsPage: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-slate-100 flex flex-col justify-between pb-24 md:pb-8">
-      <div className="space-y-4">
-        {/* Banner */}
-        <PilotBanner />
+    <div className="p-4 space-y-4 max-w-xl mx-auto w-full">
 
-        {/* Main Content Container */}
-        <div className="max-w-4xl mx-auto px-3 sm:px-6 space-y-4">
+      {/* Pilot Warning Banner (Dashed border card) */}
+      <div className="border border-dashed border-amber-500/40 bg-amber-950/20 rounded-xl p-3 flex items-center gap-2.5 text-xs text-amber-300/90 shadow-sm">
+        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+        <span className="leading-snug">
+          Pilot platform. Alerts on this screen are simulated for guardians, not real dispatches.
+        </span>
+      </div>
 
-          {/* Section Header & Create Button */}
-          <div className="bg-[#0D1527]/90 border border-slate-800/90 rounded-2xl p-4 sm:p-5 backdrop-blur-md shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500/20 to-teal-500/20 border border-amber-500/30 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/10">
-                <Compass className="w-5 h-5 text-amber-400" />
-              </div>
-              <div>
-                <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-                  Travel Safety Plans
-                </h1>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Organize itineraries, assign travellers, and validate safety windows
-                </p>
-              </div>
-            </div>
+      {/* Section Title & Subtitle */}
+      <div className="space-y-0.5 pt-1">
+        <h2 className="text-2xl font-black text-white tracking-tight">Travel plans</h2>
+        <p className="text-xs text-slate-400">Set a safety window for every trip.</p>
+      </div>
 
+      {/* Full-width + New trip Button */}
+      <button
+        onClick={openAddModal}
+        className="w-full py-3 bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-sm rounded-2xl shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2 transition active:scale-[0.98]"
+      >
+        <Plus className="w-4 h-4 stroke-[3]" /> New trip
+      </button>
+
+      {/* 3 Stat Cards Row */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-[#0D1527]/90 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg">
+          <div className="text-2xl font-black text-teal-400">{activeTripsCount}</div>
+          <div className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase mt-1">ACTIVE</div>
+        </div>
+
+        <div className="bg-[#0D1527]/90 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg">
+          <div className="text-2xl font-black text-amber-400">{upcomingTripsCount}</div>
+          <div className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase mt-1">UPCOMING</div>
+        </div>
+
+        <div className="bg-[#0D1527]/90 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg">
+          <div className="text-2xl font-black text-cyan-400">{completedTripsCount}</div>
+          <div className="text-[10px] font-extrabold text-slate-400 tracking-wider uppercase mt-1">DONE</div>
+        </div>
+      </div>
+
+      {/* Filter Tabs Bar */}
+      <div className="border-b border-slate-800 pb-2">
+        <div className="flex items-center gap-6 text-sm overflow-x-auto scrollbar-none">
+          {(
+            [
+              { id: 'all', label: 'All trips' },
+              { id: 'active', label: 'Active' },
+              { id: 'upcoming', label: 'Upcoming' },
+              { id: 'completed', label: 'Done' },
+            ] as const
+          ).map((tab) => (
             <button
-              onClick={openAddModal}
-              className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-teal-400 via-cyan-500 to-blue-500 hover:from-teal-300 hover:to-blue-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-1.5 transition active:scale-95"
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`pb-2 font-semibold text-xs sm:text-sm whitespace-nowrap transition relative ${
+                activeTab === tab.id
+                  ? 'text-teal-300 font-bold after:absolute after:-bottom-[9px] after:left-0 after:right-0 after:h-0.5 after:bg-teal-400 after:rounded-full'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              <Plus className="w-4 h-4 stroke-[2.5]" /> Create Travel Plan
+              {tab.label}
             </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Trips List / Empty State */}
+      {filteredTrips.length === 0 ? (
+        <div className="py-6 flex flex-col items-center justify-center text-center space-y-4">
+          {/* Curved Dashed Route Path SVG Graphic */}
+          <div className="py-2">
+            <svg className="w-56 h-16" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M 20 45 C 70 10, 130 60, 180 15"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeDasharray="6 6"
+                className="text-teal-500/60"
+              />
+              <circle cx="20" cy="45" r="4" className="fill-teal-400" />
+              <circle cx="180" cy="15" r="4" className="fill-amber-400" />
+            </svg>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <div className="bg-[#0D1527]/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-slate-400 text-[10px] sm:text-xs font-semibold uppercase tracking-wider">
-                <span>Active</span>
-                <Clock className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-              <div className="text-lg sm:text-2xl font-black text-emerald-400 mt-1">
-                {activeTripsCount}
-              </div>
-            </div>
-
-            <div className="bg-[#0D1527]/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-slate-400 text-[10px] sm:text-xs font-semibold uppercase tracking-wider">
-                <span>Upcoming</span>
-                <Calendar className="w-3.5 h-3.5 text-amber-400" />
-              </div>
-              <div className="text-lg sm:text-2xl font-black text-amber-400 mt-1">
-                {upcomingTripsCount}
-              </div>
-            </div>
-
-            <div className="bg-[#0D1527]/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-slate-400 text-[10px] sm:text-xs font-semibold uppercase tracking-wider">
-                <span>Completed</span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
-              </div>
-              <div className="text-lg sm:text-2xl font-black text-cyan-400 mt-1">
-                {completedTripsCount}
-              </div>
-            </div>
+          <div className="space-y-1 max-w-xs mx-auto">
+            <h3 className="font-extrabold text-lg text-white">No trips mapped yet</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Add a traveller and a safety window, and we'll watch the route with you.
+            </p>
           </div>
 
-          {/* Filter Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-[#0D1527] border border-slate-800 rounded-xl text-xs overflow-x-auto scrollbar-none">
-            {(
-              [
-                { id: 'all', label: 'All Trips', count: trips.length },
-                { id: 'active', label: 'Active', count: activeTripsCount },
-                { id: 'upcoming', label: 'Upcoming', count: upcomingTripsCount },
-                { id: 'completed', label: 'Completed', count: completedTripsCount },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 min-w-[75px] py-1.5 px-3 rounded-lg font-semibold text-[11px] transition whitespace-nowrap flex items-center justify-center gap-1.5 ${
-                  activeTab === tab.id
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <span>{tab.label}</span>
-                <span
-                  className={`text-[9px] px-1.5 py-0.2 rounded-full ${
-                    activeTab === tab.id
-                      ? 'bg-cyan-400/30 text-cyan-200'
-                      : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={openAddModal}
+            className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition active:scale-95"
+          >
+            Create first trip
+          </button>
 
-          {/* Trips List / Empty State */}
-          {filteredTrips.length === 0 ? (
-            <div className="bg-[#0D1527]/90 border border-slate-800/80 rounded-2xl p-6 sm:p-8 text-center space-y-4 backdrop-blur-md shadow-2xl">
-              <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full bg-cyan-500/10 animate-ping opacity-75" />
-                <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/80 flex items-center justify-center shadow-inner">
-                  <Compass className="w-7 h-7 text-cyan-400" />
-                </div>
-              </div>
-
-              <div className="space-y-1.5 max-w-sm mx-auto">
-                <h3 className="font-extrabold text-base text-white">No travel plans created yet</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Assign travellers, monitor geofenced safe zones, and maintain active safety windows while on the go.
-                </p>
-              </div>
-
-              <button
-                onClick={openAddModal}
-                className="px-5 py-2.5 bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-teal-500/20 inline-flex items-center gap-1.5 transition active:scale-95"
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" /> Create First Trip
-              </button>
-
-              {/* Safety Features Overview Badges */}
-              <div className="pt-4 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-2 text-left">
-                <div className="flex items-center gap-2 p-2 rounded-xl bg-[#162036]/60 border border-slate-800 text-[11px] text-slate-300">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Geofenced Safe Zones</span>
-                </div>
-                <div className="flex items-center gap-2 p-2 rounded-xl bg-[#162036]/60 border border-slate-800 text-[11px] text-slate-300">
-                  <Navigation className="w-4 h-4 text-cyan-400 shrink-0" />
-                  <span>Live Traveller Tracking</span>
-                </div>
-                <div className="flex items-center gap-2 p-2 rounded-xl bg-[#162036]/60 border border-slate-800 text-[11px] text-slate-300">
-                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Emergency Dispatch</span>
-                </div>
-              </div>
+          {/* Bottom 3 Feature Cards */}
+          <div className="grid grid-cols-3 gap-3 w-full pt-4">
+            <div className="bg-[#0D1527]/90 border border-slate-800/90 rounded-2xl p-4 flex flex-col items-center justify-center text-center space-y-2 shadow-md">
+              <MapPin className="w-5 h-5 text-teal-400 shrink-0" />
+              <span className="text-xs font-semibold text-slate-300 leading-tight">Safe zones</span>
             </div>
+
+            <div className="bg-[#0D1527]/90 border border-slate-800/90 rounded-2xl p-4 flex flex-col items-center justify-center text-center space-y-2 shadow-md">
+              <Navigation className="w-5 h-5 text-teal-400 shrink-0" />
+              <span className="text-xs font-semibold text-slate-300 leading-tight">Live tracking</span>
+            </div>
+
+            <div className="bg-[#0D1527]/90 border border-slate-800/90 rounded-2xl p-4 flex flex-col items-center justify-center text-center space-y-2 shadow-md">
+              <PhoneCall className="w-5 h-5 text-amber-400 shrink-0" />
+              <span className="text-xs font-semibold text-slate-300 leading-tight">Emergency dispatch</span>
+            </div>
+          </div>
+        </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {filteredTrips.map((trip) => {
@@ -442,10 +426,8 @@ export const TripsPage: React.FC = () => {
               })}
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Modern Modal Dialog */}
+        {/* Modern Modal Dialog */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
           <div className="bg-[#0D1527] border border-slate-800 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">

@@ -1,76 +1,71 @@
-# TrackGuard ESP32-C3 Hardware Schematic & Wiring Guide (SIH)
+# TrackGuard ESP32-C3 Hardware Schematic & Wiring Guide
 
-This guide documents the exact pin mapping and circuit setup for connecting the 7 hardware components to the **ESP32-C3** microcontroller and syncing with **Firebase Realtime Database** (`https://trackguard-dd2d4-default-rtdb.firebaseio.com`).
+This guide documents the exact pin mapping and circuit setup for the **ESP32-C3 SuperMini** smart safety band hardware.
 
 ---
 
-## Hardware Components List
+## 📌 ESP32-C3 SuperMini Header Pin Assignment Table
 
-| # | Component | Model / Type | Purpose |
+```
+                  ESP32-C3 SuperMini Header
+                       +--------------+
+                 5V    | [ ]      [ ] | 5V / VBUS (Power In / Out)
+                GND    | [ ]      [ ] | GND (Common Ground)
+               3.3V    | [ ]      [ ] | 3.3V Power Rail
+           GPS TX ---->| GPIO0  GPIO6 |---> SPI Flash CLK (Do Not Use)
+           GPS RX ---->| GPIO1  GPIO7 |---> SPI Flash HD (Do Not Use)
+                       | GPIO2  GPIO8 |---> General Purpose IO
+           RGB RED <---| GPIO3  GPIO9 |---> SOS Push Button (Active LOW)
+         RGB GREEN <---| GPIO4  GPIO10|---> Active Siren Buzzer
+          RGB BLUE <---| GPIO5  TX    |---> GPIO21 (Hardware TX)
+                       |        RX    |---> GPIO20 (Hardware RX)
+                       +--------------+
+```
+
+### 🔌 Pin Connections
+
+| # | Hardware Component | ESP32-C3 SuperMini Pin Label | Wiring Instructions |
 |---|---|---|---|
-| 1 | **Microcontroller** | ESP32-C3 (SuperMini / DevModule) | Processing, Wi-Fi connectivity, Firebase RTDB sync |
-| 2 | **GPS Module** | Neo-6M / GT-U7 | Real-time latitude, longitude, satellite tracking |
-| 3 | **SOS Push Button** | Tactile Switch (Momentary) | Panic button distress trigger |
-| 4 | **Tamper / Disconnect Switch** | Microswitch / Cut-wire latch | Detects unauthorized wristband removal/cut |
-| 5 | **Battery & Charger** | 3.7V 500mAh Li-Po + TP4056 | Portable power with battery voltage sensing |
-| 6 | **Haptics & Siren** | 3V Vibration Motor + 5V Active Buzzer | Physical haptic feedback & alarm siren |
-| 7 | **Visual Status Indicator** | Common Cathode RGB LED / WS2812B | Mode status (Green=Safe, Red=SOS, Orange=Tamper) |
+| 1 | **GPS Module TX** | **`Pin 0`** | Connect GPS Module **TX** pin to ESP32 **Pin 0** (Hardware RX) |
+| 2 | **GPS Module RX** | **`Pin 1`** | Connect GPS Module **RX** pin to ESP32 **Pin 1** (Hardware TX) |
+| 3 | **3-Pin RGB LED (Red)** | **`Pin 3`** | Connect RGB LED **Red** pin to **Pin 3** |
+| 4 | **3-Pin RGB LED (Green)** | **`Pin 4`** | Connect RGB LED **Green** pin to **Pin 4** |
+| 5 | **3-Pin RGB LED (Blue)** | **`Pin 5`** | Connect RGB LED **Blue** pin to **Pin 5** |
+| 6 | **SOS Push Button** | **`Pin 9`** | Connect Tactile Push Button between **Pin 9** and **GND** |
+| 7 | **Active Buzzer** | **`Pin 10`** | Connect Active Buzzer positive wire to **Pin 10**, negative to **GND** |
+| 8 | **Power & GND** | **`5V` / `GND`** | Connect VCC to **5V (VBUS)** and GND to **GND** |
 
 ---
 
-## ESP32-C3 Pin Allocation Table
+## 🎨 RGB LED Status Modes (Pins 3, 4, 5)
 
-```
-                         ESP32-C3 SuperMini
-                          +--------------+
-             ADC1_CH0 <---| GPIO1  GPIO0 |---> (NC)
-             (NC)     <---| GPIO2  GPIO3 |---> SOS Push Button (Interrupt)
-  Tamper Switch       <---| GPIO4  GPIO5 |---> Vibration Motor (PWM)
-  Active Siren Buzzer <---| GPIO6  GPIO7 |---> (NC)
-  RGB LED (Red)       <---| GPIO8  GPIO9 |---> RGB LED (Green)
-  RGB LED (Blue)      <---| GPIO10 5V    |---> 5V Power Rail
-  GPS Module (TX)     <---| GPIO20 GND   |---> Common Ground
-  GPS Module (RX)     <---| GPIO21 3.3V  |---> 3.3V Power Rail
-                          +--------------+
-```
-
-| Component | ESP32-C3 Pin | Wiring Notes |
+| Color | Status Meaning | Trigger Condition |
 |---|---|---|
-| **GPS RX** | `GPIO21` | Connect to GPS Module **TX** pin |
-| **GPS TX** | `GPIO20` | Connect to GPS Module **RX** pin |
-| **SOS Push Button** | `GPIO3` | Connect switch to **GPIO3** and **GND** (Internal `INPUT_PULLUP` enabled) |
-| **Tamper Sensor** | `GPIO4` | Connect microswitch latch to **GPIO4** and **GND** |
-| **Battery ADC** | `GPIO1` | Connect through 100k + 100k voltage divider to Li-Po Positive terminal |
-| **Vibration Motor** | `GPIO5` | Connect base of NPN transistor (2N2222) with 1k resistor to GPIO5 |
-| **Buzzer** | `GPIO6` | Active piezo buzzer positive to GPIO6, negative to GND |
-| **RGB LED (Red)** | `GPIO8` | Connect via 220Ω resistor to Red anode |
-| **RGB LED (Green)**| `GPIO9` | Connect via 220Ω resistor to Green anode |
-| **RGB LED (Blue)** | `GPIO10`| Connect via 220Ω resistor to Blue anode |
+| 🟢 **Green** | **Normal / Safe Mode** | Band powered on, GPS searching or active, no emergency |
+| 🔵 **Blue** | **Bluetooth Paired** | Web App / Phone connected over BLE (`TRACKGUARD-BAND-001`) |
+| 🟡 **Yellow** | **GPS Searching** | Powered on indoors, waiting for satellite lock |
+| 🔴 **Red** | **EMERGENCY SOS** | SOS Push Button (Pin 9) pressed or remote alarm triggered |
 
 ---
 
-## Battery Voltage Sensing Divider Circuit (GPIO1)
+## 🔊 Alarm Siren Behavior (Pin 10)
 
-Li-Po battery voltage (3.2V - 4.2V) exceeds ESP32-C3 maximum ADC input voltage (3.3V). Connect a 1:2 voltage divider:
-
-```
- Li-Po Positive (+) ------ [ 100k Ω Resistor ] ------+------ GPIO1 (ESP32-C3 ADC)
-                                                    |
-                                            [ 100k Ω Resistor ]
-                                                    |
- Ground (GND) --------------------------------------+
-```
+* **Trigger:** Pressing the SOS Button (Pin 9) or receiving `"START_ALARM"` BLE command.
+* **Auto-Stop Timer:** The buzzer will sound for **10 seconds** and automatically turn off.
+* **Manual Stop:** Receiving `"STOP_ALARM"` command via BLE immediately stops the alarm.
 
 ---
 
-## Arduino IDE Configuration
+## 💻 Arduino IDE Setup Instructions
 
-1. Open **Arduino IDE** (v2.x recommended).
-2. Go to **File -> Preferences** and add to Additional Board Manager URLs:
-   `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
-3. Go to **Tools -> Board -> Boards Manager**, search `esp32`, and install **esp32 by Espressif Systems** (version 2.0.11 or later).
-4. Select **Tools -> Board -> ESP32-C3 Dev Module**.
-5. Install required libraries from Library Manager (`Ctrl + Shift + I`):
-   - **TinyGPSPlus** by Mikal Hart
-   - **ArduinoJson** by Benoit Blanchon (v6.x)
-6. Open `TrackGuard_ESP32C3.ino`, update `WIFI_SSID` and `WIFI_PASSWORD`, then click **Upload**!
+1. Open **Arduino IDE**.
+2. Board Manager URL: `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
+3. Select **Tools -> Board -> ESP32 Arduino -> ESP32C3 Dev Module**.
+4. Configure Tools settings:
+   * **USB CDC On Boot:** `Enabled`
+   * **Upload Speed:** `921600` or `115200`
+   * **Port:** Select `COMx` (ESP32-C3 Serial Port)
+5. Install Libraries via Library Manager (`Ctrl + Shift + I`):
+   * `TinyGPSPlus` by Mikal Hart
+   * `Adafruit NeoPixel` by Adafruit
+6. Upload `TrackGuard_ESP32C3.ino` and open **Serial Monitor** at **115200 Baud**.

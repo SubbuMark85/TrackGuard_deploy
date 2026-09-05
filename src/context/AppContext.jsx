@@ -1,72 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { LocationService, OOTY_COORDINATES } from '../services/LocationService';
 import { bandService as BandService } from '../services/bandService';
 import { EmergencyService, EMERGENCY_STEPS } from '../services/EmergencyService';
 import { ResponderService } from '../services/ResponderService';
 import { notificationService as NotificationService } from '../services/notificationService';
 import { hardwareRtdbService } from '../services/hardwareRtdbService';
+import { DEMO_STEPS } from '../constants/demoSteps';
+
+export { DEMO_STEPS };
 
 
 const AppContext = createContext();
-
-export const DEMO_STEPS = [
-  {
-    id: 1,
-    title: "1. Traveler is Safe",
-    subtitle: "Ananya is at Ooty Botanical Gardens inside safe geofence",
-    status: "SAFE",
-    screen: "home"
-  },
-  {
-    id: 2,
-    title: "2. Geofence Perimeter Warning",
-    subtitle: "Traveler moves towards unmonitored zone perimeter",
-    status: "GEOFENCE_WARNING",
-    screen: "family"
-  },
-  {
-    id: 3,
-    title: "3. Band Tamper Detected!",
-    subtitle: "Safety Band senses micro-switch tension breach & force attempt",
-    status: "TAMPER_ALERT",
-    screen: "band"
-  },
-  {
-    id: 4,
-    title: "4. Guardian Alerted",
-    subtitle: "Instant high-priority distress alert delivered to parent phone",
-    status: "GUARDIAN_NOTIFIED",
-    screen: "tamper"
-  },
-  {
-    id: 5,
-    title: "5. SOS Protocol Activated",
-    subtitle: "Telemetry stream, audio link, & 5G emergency beacon locked",
-    status: "SOS_ACTIVE",
-    screen: "sos"
-  },
-  {
-    id: 6,
-    title: "6. Security Dispatch",
-    subtitle: "Command Center dispatches Patrol Unit TG-07 (ETA 7 min)",
-    status: "RESPONDER_DISPATCHED",
-    screen: "emergency"
-  },
-  {
-    id: 7,
-    title: "7. Responder En Route",
-    subtitle: "Patrol unit closing in on traveler coordinates in real-time",
-    status: "RESPONDER_EN_ROUTE",
-    screen: "responder"
-  },
-  {
-    id: 8,
-    title: "8. Incident Resolved",
-    subtitle: "Traveler verified safe by Officer Rajesh. Band re-encrypted.",
-    status: "RESOLVED",
-    screen: "home"
-  }
-];
 
 export const AppProvider = ({ children }) => {
   // App Navigation & Role
@@ -136,6 +80,8 @@ export const AppProvider = ({ children }) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const handledAlertIdsRef = useRef(new Set());
+
   // Real-time Firebase RTDB Hardware Telemetry Subscriptions
   useEffect(() => {
     // 1. Subscribe to ESP32 location node
@@ -173,14 +119,34 @@ export const AppProvider = ({ children }) => {
       }
     });
 
-    // 3. Subscribe to RTDB Alerts node
+    // 3. Subscribe to RTDB Alerts node from ESP32 Hardware
+    let isInitialLoad = true;
+
     const unsubAlerts = hardwareRtdbService.subscribeAlerts((alertsList) => {
       if (alertsList.length > 0) {
-        const activeSOS = alertsList.find(a => a.type === 'sos_push_button' && a.status === 'active');
-        if (activeSOS) {
-          triggerManualSOS();
+        const newestSOS = alertsList.find(a => a.type === 'sos_push_button' && a.status === 'active');
+        
+        if (newestSOS) {
+          if (isInitialLoad) {
+            handledAlertIdsRef.current.add(newestSOS.id);
+            isInitialLoad = false;
+          } else if (!handledAlertIdsRef.current.has(newestSOS.id)) {
+            handledAlertIdsRef.current.add(newestSOS.id);
+            
+            const incident = EmergencyService.triggerManualSOS(traveler.name, traveler.address);
+            setEmergencyIncident(incident);
+            setIsEmergencyActive(true);
+            setBandState((prev) => ({
+              ...prev,
+              tamperStatus: 'TAMPER_ALERT',
+              rgbLedMode: 'SOS_RED'
+            }));
+            setActiveScreen('sos');
+            addToast('🚨 HARDWARE SOS BUTTON PRESSED!', 'Distress alert received from physical ESP32-C3 Band!', 'danger');
+          }
         }
       }
+      isInitialLoad = false;
     });
 
     return () => {

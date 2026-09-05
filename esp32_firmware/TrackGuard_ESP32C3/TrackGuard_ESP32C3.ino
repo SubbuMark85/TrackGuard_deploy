@@ -13,8 +13,8 @@
 // ==========================================
 // CONFIGURATION: WI-FI & FIREBASE RTDB
 // ==========================================
-const char* WIFI_SSID     = "Fibrsol-2AE444";     // Your Wi-Fi SSID
-const char* WIFI_PASSWORD = "12345678";           // Your Wi-Fi Password
+const char* WIFI_SSID     = "iQOO Neo6";
+const char* WIFI_PASSWORD = "IronmanMark85"; 
 const char* FIREBASE_HOST = "https://trackguard-dd2d4-default-rtdb.firebaseio.com";
 const char* DEVICE_ID     = "TG-BAND-01";
 
@@ -25,7 +25,7 @@ const char* DEVICE_ID     = "TG-BAND-01";
 #define GPS_TX_PIN      1     // Pin 1 -> Connect to GPS RX
 
 #define SOS_PIN         9     // Pin 9 -> SOS Button (Active LOW)
-#define BUZZER_PIN      10    // Pin 10 -> Siren Buzzer
+#define BUZZER_PIN      8    // Pin 10 -> Siren Buzzer
 #define RGB_RED_PIN     4     // Red LED Pin
 #define RGB_GREEN_PIN   3     // Green LED Pin
 #define RGB_BLUE_PIN    5     // Blue LED Pin
@@ -262,12 +262,12 @@ void loop() {
   }
   previousButtonState = currentButtonState;
 
-  // 3. 10-Second Auto-Stop Siren Timer
+  // 3. 2-Second Auto-Stop Siren Timer
   if (sosActive) {
     if (millis() - sosStartTime >= ALARM_DURATION_MS) {
       sosActive = false;
       buzzerOFF();
-      Serial.println("\n[SYSTEM] ⏰ 10s Alarm Auto-Stopped");
+      Serial.println("\n[SYSTEM] ⏰ 2s Alarm Auto-Stopped");
       WiFi.status() == WL_CONNECTED ? wifiConnectedLED() : normalLED();
     }
   }
